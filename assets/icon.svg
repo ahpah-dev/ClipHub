@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="48" y1="32" x2="464" y2="480" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#131B31" />
+      <stop offset="100%" stop-color="#090D18" />
+    </linearGradient>
+    <radialGradient id="ambientGlow" cx="35%" cy="28%" r="70%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.34" />
+      <stop offset="55%" stop-color="#818CF8" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#090D18" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="glassStroke" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.45" />
+      <stop offset="50%" stop-color="#94A3B8" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.35" />
+    </linearGradient>
+    <linearGradient id="prismBack" x1="120" y1="120" x2="360" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.72" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0.32" />
+    </linearGradient>
+    <linearGradient id="prismFront" x1="175" y1="145" x2="390" y2="375" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F8FAFC" stop-opacity="0.96" />
+      <stop offset="48%" stop-color="#BAE6FD" stop-opacity="0.88" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0.82" />
+    </linearGradient>
+    <linearGradient id="sparkGrad" x1="340" y1="100" x2="410" y2="170" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#67E8F9" />
+      <stop offset="100%" stop-color="#A78BFA" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded Squircle Container -->
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#bgGrad)" />
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#ambientGlow)" />
+  <rect x="25.5" y="25.5" width="461" height="461" rx="110.5" stroke="url(#glassStroke)" stroke-width="3" />
+
+  <!-- Subtle Glass Film Frame Bracket -->
+  <rect x="92" y="106" width="328" height="300" rx="52" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="2" />
+
+  <!-- Back Glass Layer (Clip Frame / Hub Node) -->
+  <rect x="128" y="148" width="166" height="216" rx="34" fill="url(#prismBack)" stroke="#BAE6FD" stroke-opacity="0.45" stroke-width="2.5" />
+
+  <!-- Front Frosted Play-Prism -->
+  <path
+    d="M214 156.5C214 142.8 229.1 134.5 240.7 141.8L374.2 225.3C385.1 232.1 385.1 247.9 374.2 254.7L240.7 338.2C229.1 345.5 214 337.2 214 323.5V156.5Z"
+    transform="translate(0, 16)"
+    fill="url(#prismFront)"
+    stroke="#FFFFFF"
+    stroke-opacity="0.7"
+    stroke-width="2.5"
+  />
+
+  <!-- AI Motion Spark -->
+  <path
+    d="M366 108L373.5 130.5L396 138L373.5 145.5L366 168L358.5 145.5L336 138L358.5 130.5L366 108Z"
+    fill="url(#sparkGrad)"
+  />
+</svg>

@@ -1,0 +1,68 @@
+{
+  "name": "cliphub",
+  "version": "1.0.0",
+  "description": "ClipHub — Standalone AI Remotion Video Studio with BYOK and Native MP4 Rendering",
+  "main": "dist-electron/main/index.js",
+  "author": "ClipHub",
+  "license": "Unlicense",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run build:renderer && npm run build:electron",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.543",
+    "@remotion/player": "4.0.543",
+    "@remotion/renderer": "4.0.543",
+    "@remotion/shapes": "4.0.543",
+    "@remotion/transitions": "4.0.543",
+    "esbuild": "^0.25.0",
+    "lucide-react": "^1.72.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.543"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
+  },
+  "build": {
+    "appId": "com.cliphub.studio",
+    "productName": "ClipHub",
+    "asar": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "assets/**/*",
+      "!node_modules/.remotion/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  }
+}
