@@ -21,14 +21,14 @@ export const videoConfig = {
   height: 1080,
 };
 
-export const GeneratedVideo: React.FC = () => {
+export const GeneratedVideo: React.FC<{ assets?: Record<string, string> }> = ({ assets }) => {
   // ...
 };
 \`\`\`
 
 ALLOWED IMPORTS ONLY (no other third-party packages or relative file imports):
 - \`react\` (useMemo, etc. — do NOT rely on useState/useEffect for animation)
-- \`remotion\` (AbsoluteFill, Sequence, Series, useCurrentFrame, useVideoConfig, spring, interpolate, interpolateColors, Easing, random)
+- \`remotion\` (AbsoluteFill, Sequence, Series, Img, useCurrentFrame, useVideoConfig, spring, interpolate, interpolateColors, Easing, random)
 - \`@remotion/transitions\` (TransitionSeries, linearTiming, springTiming)
 - \`@remotion/transitions/fade\` (fade)
 - \`@remotion/transitions/slide\` (slide)
@@ -36,11 +36,17 @@ ALLOWED IMPORTS ONLY (no other third-party packages or relative file imports):
 - \`@remotion/shapes\` (Rect, Circle, Triangle, Star, Polygon, Ellipse)
 - \`lucide-react\` (any standard UI icon such as Sparkles, Zap, ArrowRight, CheckCircle2, Play, Layers, TrendingUp, Globe, Shield, Cpu, etc.)
 
+USER-ATTACHED IMAGES & FILES:
+- The user may attach reference images (screenshots, logos, photos) or text/data files (JSON, CSV, SVG, Markdown).
+- If image assets are provided in the prompt (e.g. \`asset-1\`, \`asset-2\`), they are passed to your component via \`assets?.['asset-1']\` at runtime.
+- When the user wants their uploaded image or logo featured in the video, render it with Remotion's \`<Img src={assets['asset-1']} style={{ ... }} />\` (always guard with \`assets?.['asset-1'] && <Img ... />\`, never hardcode base64 data URLs directly in TSX).
+- When the user attaches an image as a visual/style/UI reference, match its palette, layout, and typography closely.
+
 FORBIDDEN PATTERNS (WILL BREAK RENDERING OR CAUSE FLICKER):
 1. NEVER use CSS \`transition\`, CSS \`@keyframes\`, \`animate-pulse\`, or Tailwind classes (Tailwind is NOT loaded; use inline \`React.CSSProperties\` styles exclusively).
 2. NEVER use \`Math.random()\` — always use Remotion's deterministic \`random(seed)\` so every frame renders identically across multi-threaded workers.
 3. NEVER use \`setTimeout\`, \`setInterval\`, \`requestAnimationFrame\`, \`useEffect\`, or \`fetch()\`.
-4. NEVER reference external image/video URLs (\`https://...\`) or local files — build all graphics, UI mockups, charts, icons, particles, and illustrations procedurally with SVG, CSS, \`@remotion/shapes\`, and \`lucide-react\`.
+4. NEVER reference external image/video URLs (\`https://...\`) or arbitrary local file paths — use either \`assets?.['asset-N']\` for user-uploaded images or procedural SVG, CSS, \`@remotion/shapes\`, and \`lucide-react\`.
 5. ALWAYS clamp every \`interpolate(...)\` call with \`{ extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }\` unless continuous unbounded repetition is explicitly desired.
 6. ALWAYS guard \`spring({ frame: Math.max(0, ...), fps, ... })\` or ensure frame math handles negative/zero gracefully, and keep \`durationInFrames\` accurate to the sum of your scenes minus transition overlaps.
 
@@ -90,7 +96,7 @@ If the user asks to modify an existing video and provides the current TSX:
 export const DIRECTOR_GUIDE_MARKDOWN = `# ClipHub Motion Director — Prompting & BYOK Guide
 
 ## How ClipHub Works
-1. **Describe Your Video**: Type what you want to create (e.g., product launch, SaaS metrics recap, feature spotlight, kinetic quote, vertical reel, or explainer).
+1. **Describe Your Video (and Attach Files/Images)**: Type what you want to create, and optionally click **Attach**, drag-and-drop, or paste (\`Ctrl+V\`) images, logos, screenshots, or data files (\`.svg\`, \`.json\`, \`.csv\`, \`.md\`, \`.txt\`). Attached images are sent multimodally to your AI and bound automatically as runtime \`assets\` for Remotion \`<Img>\`.
 2. **AI Crafts Remotion React**: ClipHub sends your prompt + the Motion Director System Prompt to your chosen BYOK model. It generates deterministic Remotion React TSX, verifies compilation automatically with \`esbuild\`, and auto-repairs syntax/import issues if needed.
 3. **Instant Live Preview**: Scrub frame-by-frame or play at full 30/60 FPS directly inside the glass viewport.
 4. **Native MP4 Export**: Click **Render MP4** to bundle with \`@remotion/bundler\` and render hardware-accurate H.264/H.265 MP4 video natively via \`@remotion/renderer\`.

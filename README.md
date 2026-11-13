@@ -27,6 +27,7 @@
 ## Features
 
 - **BYOK Multi-Provider AI**: Connect your own API key for **OpenAI**, **Anthropic Claude**, **Google Gemini**, **OpenRouter**, or any **Custom OpenAI-Compatible** endpoint (Ollama, LM Studio, vLLM, Groq). Keys are stored locally using Electron's OS-level encryption (`safeStorage`).
+- **Multimodal Image & File Attachments**: Attach, drag-and-drop, or paste (`Ctrl+V`) images (PNG, JPG, WebP, GIF), SVGs, or text/data files (JSON, CSV, Markdown, TXT). Images are sent multimodally to the AI and wired into Remotion `<Img src={assets['asset-1']} />` for both live preview and native MP4 export.
 - **Elite Motion Director System Prompt**: Built-in choreography & deterministic Remotion React prompt (`src/shared/systemPrompt.ts`), inspectable and customizable right inside the app, plus persistent custom brand/style instructions and an interactive Director Guide.
 - **Auto-Verify & Auto-Repair Loop**: Generated TSX is immediately compiled with `esbuild` and validated against the allowed Remotion runtime imports; if a syntax or import issue occurs, ClipHub automatically asks the model to repair it.
 - **Live Glass Stage (`@remotion/player`)**: Frame-accurate timeline scrubbing, play/pause, frame stepping, loop toggle, safe-zone & rule-of-thirds guides, and an editable live `Composition.tsx` drawer.

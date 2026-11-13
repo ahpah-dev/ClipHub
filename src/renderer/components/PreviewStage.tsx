@@ -95,8 +95,9 @@ class PreviewErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 }
 
 interface PreviewStageProps {
-  component: React.FC | null;
+  component: React.FC<{ assets?: Record<string, string> }> | null;
   meta: VideoCompositionMeta;
+  assets?: Record<string, string>;
   compileError: string | null;
   isGenerating: boolean;
   codeHash: string;
@@ -106,6 +107,7 @@ interface PreviewStageProps {
 export const PreviewStage: React.FC<PreviewStageProps> = ({
   component,
   meta,
+  assets,
   compileError,
   isGenerating,
   codeHash,
@@ -347,6 +349,7 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
                 ref={playerRef}
                 key={codeHash}
                 component={component}
+                inputProps={{ assets: assets ?? {} }}
                 durationInFrames={meta.durationInFrames}
                 fps={meta.fps}
                 compositionWidth={meta.width}

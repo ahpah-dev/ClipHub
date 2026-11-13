@@ -1,6 +1,6 @@
 {
   "name": "cliphub",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ClipHub — Standalone AI Remotion Video Studio with BYOK and Native MP4 Rendering",
   "main": "dist-electron/main/index.js",
   "author": "ClipHub",
@@ -51,8 +51,7 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "assets/icon.png"
     },

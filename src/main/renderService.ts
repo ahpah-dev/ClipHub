@@ -100,6 +100,7 @@ export const RemotionRoot: React.FC = () => {
       fps={${Math.max(1, Math.round(req.meta.fps))}}
       width={${Math.max(100, Math.round(req.meta.width))}}
       height={${Math.max(100, Math.round(req.meta.height))}}
+      defaultProps={{ assets: {} }}
     />
   );
 };
@@ -126,6 +127,7 @@ registerRoot(RemotionRoot);
       appNodeModules,
       outputPath,
       meta: req.meta,
+      assets: req.assets ?? {},
       codec: req.codec,
       crf: req.crf,
     }),

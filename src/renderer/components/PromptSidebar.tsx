@@ -1,18 +1,24 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bot,
   CheckCircle2,
+  FileText,
   Loader2,
+  Paperclip,
   Send,
   Sparkles,
   Wand2,
+  X,
 } from 'lucide-react';
-import { ChatTurn, GenerateVideoRequest } from '@shared/types';
+import { ChatTurn, GenerateVideoRequest, PromptAttachment } from '@shared/types';
 
 interface PromptSidebarProps {
   prompt: string;
   onPromptChange: (val: string) => void;
+  attachments: PromptAttachment[];
+  onAddFiles: (files: FileList | File[]) => void;
+  onRemoveAttachment: (id: string) => void;
   mode: GenerateVideoRequest['mode'];
   onModeChange: (m: GenerateVideoRequest['mode']) => void;
   aspectRatio: GenerateVideoRequest['aspectRatio'];
@@ -37,6 +43,9 @@ const SAMPLE_PROMPTS = [
 export const PromptSidebar: React.FC<PromptSidebarProps> = ({
   prompt,
   onPromptChange,
+  attachments,
+  onAddFiles,
+  onRemoveAttachment,
   mode,
   onModeChange,
   aspectRatio,
@@ -51,16 +60,46 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
   onGenerate,
   onOpenSettings,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isGenerating && prompt.trim()) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isGenerating && (prompt.trim() || attachments.length > 0)) {
       e.preventDefault();
       onGenerate();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.files;
+    if (items && items.length > 0) {
+      e.preventDefault();
+      onAddFiles(items);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      onAddFiles(e.dataTransfer.files);
     }
   };
 
   return (
     <aside
       className="glass-panel"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setIsDragging(false);
+        }
+      }}
+      onDrop={handleDrop}
       style={{
         width: 372,
         borderRadius: 18,
@@ -68,8 +107,34 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
         flexDirection: 'column',
         overflow: 'hidden',
         flexShrink: 0,
+        position: 'relative',
+        borderColor: isDragging ? 'rgba(56, 189, 248, 0.55)' : undefined,
       }}
     >
+      {isDragging && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            background: 'rgba(8, 14, 30, 0.84)',
+            backdropFilter: 'blur(8px)',
+            border: '2px dashed rgba(56, 189, 248, 0.65)',
+            borderRadius: 18,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            pointerEvents: 'none',
+          }}
+        >
+          <Paperclip size={26} color="#38BDF8" />
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#BAE6FD' }}>Drop images or files</div>
+          <div style={{ fontSize: 12, color: '#94A3B8' }}>PNG, JPG, WebP, SVG, JSON, CSV, Markdown, TXT</div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div
         style={{
@@ -295,6 +360,39 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
                   </span>
                 )}
               </div>
+
+              {turn.attachments && turn.attachments.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                  {turn.attachments.map((att) => (
+                    <div
+                      key={att.id}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '3px 7px',
+                        borderRadius: 8,
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: 11,
+                        color: '#CBD5E1',
+                      }}
+                    >
+                      {att.kind === 'image' && att.dataUrl ? (
+                        <img
+                          src={att.dataUrl}
+                          alt={att.name}
+                          style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <FileText size={12} color="#7DD3FC" />
+                      )}
+                      <span>{att.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ color: turn.error ? '#FECDD3' : '#E2E8F0', whiteSpace: 'pre-wrap' }}>
                 {turn.error || turn.content}
               </div>
@@ -330,27 +428,112 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
           background: 'rgba(6, 10, 20, 0.48)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 10,
+          gap: 9,
         }}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,.svg,.txt,.md,.json,.csv,.ts,.tsx,.js,.css,.html,.xml"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              onAddFiles(e.target.files);
+              e.target.value = '';
+            }
+          }}
+        />
+
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {attachments.map((att) => (
+              <div
+                key={att.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 8px',
+                  borderRadius: 9,
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  border: '1px solid rgba(56, 189, 248, 0.28)',
+                  fontSize: 11.5,
+                  color: '#E2E8F0',
+                  maxWidth: '100%',
+                }}
+              >
+                {att.kind === 'image' && att.dataUrl ? (
+                  <img
+                    src={att.dataUrl}
+                    alt={att.name}
+                    style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}
+                  />
+                ) : (
+                  <FileText size={13} color="#7DD3FC" style={{ flexShrink: 0 }} />
+                )}
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 150,
+                  }}
+                  title={`${att.name} (${att.id})`}
+                >
+                  {att.name}
+                </span>
+                <button
+                  onClick={() => onRemoveAttachment(att.id)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                  }}
+                  title="Remove attachment"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <textarea
           className="glass-textarea"
           rows={4}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={
             mode === 'create'
-              ? 'Describe the video you want (scenes, style, copy, numbers, colors)...'
-              : 'Describe how to refine the current video (e.g. "Add a kinetic pricing card scene, change accent to emerald")...'
+              ? 'Describe your video, or drop/paste images, logos, screenshots, or data files...'
+              : 'Describe refinements, or attach new images/files to include...'
           }
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, color: '#64748B', fontFamily: 'var(--font-mono)' }}>Ctrl+Enter to run</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              className="glass-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isGenerating}
+              style={{ padding: '6px 10px', fontSize: 12 }}
+              title="Attach images (PNG/JPG/WebP/SVG) or text/JSON/CSV files (or drag & paste)"
+            >
+              <Paperclip size={13} color="#7DD3FC" />
+              <span>Attach</span>
+            </button>
+            <span style={{ fontSize: 11, color: '#64748B', fontFamily: 'var(--font-mono)' }}>Ctrl+Enter</span>
+          </div>
+
           <button
             className="glass-btn-primary"
-            disabled={isGenerating || !prompt.trim()}
+            disabled={isGenerating || (!prompt.trim() && attachments.length === 0)}
             onClick={onGenerate}
           >
             {isGenerating ? (

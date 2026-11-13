@@ -4,6 +4,7 @@ import {
   ChatTurn,
   GenerateVideoRequest,
   PROVIDER_PRESETS,
+  PromptAttachment,
   RenderProgressEvent,
   VideoProject,
 } from '@shared/types';
@@ -36,6 +37,7 @@ export const App: React.FC = () => {
   const [activeId, setActiveId] = useState<string>(STARTER_PROJECTS[0].id);
 
   const [prompt, setPrompt] = useState('');
+  const [attachments, setAttachments] = useState<PromptAttachment[]>([]);
   const [mode, setMode] = useState<GenerateVideoRequest['mode']>('create');
   const [aspectRatio, setAspectRatio] = useState<GenerateVideoRequest['aspectRatio']>('16:9');
   const [durationSec, setDurationSec] = useState<number>(9);
@@ -43,7 +45,7 @@ export const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
 
-  const [compiledComponent, setCompiledComponent] = useState<React.FC | null>(null);
+  const [compiledComponent, setCompiledComponent] = useState<React.FC<{ assets?: Record<string, string> }> | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [codeHash, setCodeHash] = useState<string>('init');
 
@@ -121,22 +123,109 @@ export const App: React.FC = () => {
   const handleNewProject = () => {
     setMode('create');
     setPrompt('');
+    setAttachments([]);
     setChatHistory([]);
   };
 
+  const handleAddFiles = useCallback(
+    async (fileList: FileList | File[]) => {
+      const files = Array.from(fileList);
+      if (files.length === 0) return;
+
+      const existingKeys = new Set<string>([
+        ...(mode === 'refine' ? Object.keys(activeProject.assets ?? {}) : []),
+        ...attachments.map((a) => a.id),
+      ]);
+
+      let nextIndex = 1;
+      const allocId = () => {
+        while (existingKeys.has(`asset-${nextIndex}`)) {
+          nextIndex++;
+        }
+        const id = `asset-${nextIndex}`;
+        existingKeys.add(id);
+        return id;
+      };
+
+      const readAsDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+
+      const readAsText = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsText(file);
+        });
+
+      const created: PromptAttachment[] = [];
+      for (const file of files) {
+        const mime = file.type || '';
+        const isSvg = mime === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+        const isRasterImage = mime.startsWith('image/') && !isSvg;
+
+        if (isRasterImage) {
+          const dataUrl = await readAsDataUrl(file);
+          created.push({
+            id: allocId(),
+            name: file.name || `pasted-image-${Date.now()}.png`,
+            mimeType: mime || 'image/png',
+            kind: 'image',
+            size: file.size,
+            dataUrl,
+          });
+        } else {
+          const textContent = await readAsText(file);
+          created.push({
+            id: allocId(),
+            name: file.name || 'attached-file.txt',
+            mimeType: mime || 'text/plain',
+            kind: 'text',
+            size: file.size,
+            textContent,
+          });
+        }
+      }
+
+      setAttachments((prev) => [...prev, ...created]);
+    },
+    [attachments, activeProject.assets, mode]
+  );
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   const runGeneration = async (customPrompt?: string, overrideMode?: GenerateVideoRequest['mode']) => {
-    const effectivePrompt = (customPrompt ?? prompt).trim();
     const effectiveMode = overrideMode ?? mode;
+    const activeAttachments = customPrompt ? [] : attachments;
+    const effectivePrompt =
+      (customPrompt ?? prompt).trim() ||
+      (activeAttachments.length > 0 ? 'Create a video incorporating the attached files and images.' : '');
     if (!effectivePrompt || isGenerating) return;
 
     const userTurn: ChatTurn = {
       id: `u-${Date.now()}`,
       role: 'user',
       content: effectivePrompt,
+      attachments: activeAttachments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        kind: a.kind,
+        dataUrl: a.dataUrl,
+      })),
       timestamp: Date.now(),
     };
     setChatHistory((prev) => [...prev, userTurn]);
-    if (!customPrompt) setPrompt('');
+    if (!customPrompt) {
+      setPrompt('');
+      setAttachments([]);
+    }
     setIsGenerating(true);
 
     try {
@@ -148,6 +237,8 @@ export const App: React.FC = () => {
         mode: effectiveMode,
         currentCode: effectiveMode === 'refine' ? activeProject.code : undefined,
         currentMeta: effectiveMode === 'refine' ? activeProject.meta : undefined,
+        currentAssets: effectiveMode === 'refine' ? activeProject.assets : undefined,
+        attachments: activeAttachments,
       });
 
       if (!result.ok || !result.code || !result.meta) {
@@ -173,6 +264,7 @@ export const App: React.FC = () => {
                 ...p,
                 meta: result.meta!,
                 code: result.code!,
+                assets: result.assets ?? p.assets,
                 updatedAt: Date.now(),
                 lastPrompt: effectivePrompt,
               }
@@ -184,6 +276,7 @@ export const App: React.FC = () => {
           id: `clip-${Date.now()}`,
           meta: result.meta,
           code: result.code,
+          assets: result.assets,
           updatedAt: Date.now(),
           lastPrompt: effectivePrompt,
         };
@@ -260,6 +353,7 @@ export const App: React.FC = () => {
       title: activeProject.meta.title,
       code: activeProject.code,
       meta: activeProject.meta,
+      assets: activeProject.assets,
       outputPath: opts.outputPath,
       codec: opts.codec,
       crf: opts.crf,
@@ -310,6 +404,9 @@ export const App: React.FC = () => {
         <PromptSidebar
           prompt={prompt}
           onPromptChange={setPrompt}
+          attachments={attachments}
+          onAddFiles={handleAddFiles}
+          onRemoveAttachment={handleRemoveAttachment}
           mode={mode}
           onModeChange={setMode}
           aspectRatio={aspectRatio}
@@ -328,6 +425,7 @@ export const App: React.FC = () => {
         <PreviewStage
           component={compiledComponent}
           meta={activeProject.meta}
+          assets={activeProject.assets}
           compileError={compileError}
           isGenerating={isGenerating}
           codeHash={codeHash}

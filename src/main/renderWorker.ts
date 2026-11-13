@@ -15,6 +15,7 @@ interface RenderJobConfig {
     width: number;
     height: number;
   };
+  assets?: Record<string, string>;
   codec: 'h264' | 'h265';
   crf: number;
 }
@@ -124,9 +125,12 @@ async function run() {
     message: 'Selecting composition & preparing frames...',
   });
 
+  const inputProps = { assets: job.assets ?? {} };
+
   const composition = await selectComposition({
     serveUrl: bundleLocation,
     id: 'ClipHubVideo',
+    inputProps,
   });
 
   fs.mkdirSync(path.dirname(job.outputPath), { recursive: true });
@@ -140,9 +144,15 @@ async function run() {
       height: job.meta.height,
     },
     serveUrl: bundleLocation,
+    inputProps,
     codec: job.codec,
     crf: job.crf,
+    imageFormat: 'jpeg',
+    jpegQuality: 92,
     pixelFormat: 'yuv420p',
+    chromiumOptions: {
+      gl: 'angle',
+    },
     outputLocation: job.outputPath,
     overwrite: true,
     onProgress: ({ renderedFrames, encodedFrames, progress, stitchStage }) => {

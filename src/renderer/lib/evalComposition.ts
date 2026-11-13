@@ -23,7 +23,7 @@ const MODULE_MAP: Record<string, unknown> = {
 };
 
 export interface EvaluatedComposition {
-  Component: React.FC;
+  Component: React.FC<{ assets?: Record<string, string> }>;
   videoConfig?: Partial<VideoCompositionMeta>;
 }
 
@@ -42,7 +42,9 @@ export function evaluateCompiledComposition(compiledCjs: string): EvaluatedCompo
   fn(customRequire, moduleObj, exportsObj, React);
 
   const resolvedExports = (moduleObj.exports ?? exportsObj) as Record<string, unknown>;
-  const Component = (resolvedExports.GeneratedVideo ?? resolvedExports.default) as React.FC | undefined;
+  const Component = (resolvedExports.GeneratedVideo ?? resolvedExports.default) as
+    | React.FC<{ assets?: Record<string, string> }>
+    | undefined;
 
   if (typeof Component !== 'function') {
     throw new Error('Compiled module does not export a valid `GeneratedVideo` React component.');

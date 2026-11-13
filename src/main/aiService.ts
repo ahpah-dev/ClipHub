@@ -4,15 +4,25 @@ import {
   GenerateVideoRequest,
   GenerateVideoResult,
   PROVIDER_PRESETS,
+  PromptAttachment,
   TestKeyResult,
   VideoCompositionMeta,
 } from '../shared/types';
 import { DEFAULT_SYSTEM_PROMPT } from '../shared/systemPrompt';
 import { compileComposition } from './compilerService';
 
+interface ImageInputPart {
+  id: string;
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+  base64: string;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  images?: ImageInputPart[];
 }
 
 function getDimensions(aspectRatio: GenerateVideoRequest['aspectRatio']) {
@@ -28,7 +38,63 @@ function buildEffectiveSystemPrompt(settings: BYOKSettings): string {
   return `${base}\n\n======================================================================\nUSER CUSTOM BRAND & STYLE INSTRUCTIONS\n======================================================================\n${custom}`;
 }
 
-function buildUserPrompt(req: GenerateVideoRequest): string {
+function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], base64: match[2] };
+}
+
+function prepareAttachments(
+  attachments: PromptAttachment[] = [],
+  existingAssets: Record<string, string> = {}
+): {
+  imageParts: ImageInputPart[];
+  mergedAssets: Record<string, string>;
+  attachmentPromptSection: string;
+} {
+  const mergedAssets: Record<string, string> = { ...existingAssets };
+  const imageParts: ImageInputPart[] = [];
+  const notes: string[] = [];
+
+  for (const att of attachments) {
+    if (att.kind === 'image' && att.dataUrl) {
+      const parsed = parseDataUrl(att.dataUrl);
+      if (parsed) {
+        mergedAssets[att.id] = att.dataUrl;
+        imageParts.push({
+          id: att.id,
+          name: att.name,
+          mimeType: parsed.mimeType,
+          dataUrl: att.dataUrl,
+          base64: parsed.base64,
+        });
+        notes.push(
+          `- Image attachment "${att.name}" (${parsed.mimeType}) -> available at runtime via \`assets?.['${att.id}']\``
+        );
+      }
+    } else if (att.kind === 'text' && att.textContent !== undefined) {
+      const clipped = att.textContent.slice(0, 48000);
+      notes.push(
+        `--- Attached File: ${att.name} (${att.mimeType || 'text/plain'}) ---\n${clipped}\n--- End of ${att.name} ---`
+      );
+    }
+  }
+
+  const existingKeys = Object.keys(existingAssets);
+  if (existingKeys.length > 0 && attachments.length === 0) {
+    notes.push(
+      `Existing project image asset keys available via \`assets\`: ${existingKeys.map((k) => `'${k}'`).join(', ')}`
+    );
+  }
+
+  return {
+    imageParts,
+    mergedAssets,
+    attachmentPromptSection: notes.length > 0 ? `\nATTACHED FILES & ASSETS:\n${notes.join('\n')}` : '',
+  };
+}
+
+function buildUserPrompt(req: GenerateVideoRequest, attachmentPromptSection: string): string {
   const { width, height } = getDimensions(req.aspectRatio);
   const targetFrames = Math.max(60, Math.round(req.targetDurationSec * req.fps));
 
@@ -37,6 +103,7 @@ function buildUserPrompt(req: GenerateVideoRequest): string {
       `REFINE EXISTING REMOTION VIDEO`,
       `Requested change: ${req.prompt}`,
       `Target canvas: ${width}x${height} (${req.aspectRatio}), ${req.fps} fps, target ~${targetFrames} frames (${req.targetDurationSec}s) unless the user requested a different duration or aspect ratio.`,
+      attachmentPromptSection,
       ``,
       `Current metadata:`,
       JSON.stringify(req.currentMeta ?? { width, height, fps: req.fps, durationInFrames: targetFrames }),
@@ -47,7 +114,9 @@ function buildUserPrompt(req: GenerateVideoRequest): string {
       '```',
       ``,
       `Return the COMPLETE updated <cliphub_meta>{...}</cliphub_meta> and full \`\`\`tsx ... \`\`\` file.`,
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   return [
@@ -58,16 +127,18 @@ function buildUserPrompt(req: GenerateVideoRequest): string {
     `- Aspect ratio: ${req.aspectRatio} (${width}x${height})`,
     `- FPS: ${req.fps}`,
     `- Target duration: ${req.targetDurationSec} seconds (${targetFrames} frames)`,
+    attachmentPromptSection,
     ``,
     `Make it visually striking, richly choreographed across multiple scenes or beats, deterministic, and 100% self-contained. Output <cliphub_meta>{...}</cliphub_meta> followed by the complete \`\`\`tsx ... \`\`\` file.`,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function extractResponseArtifacts(
   rawText: string,
   fallbackMeta: VideoCompositionMeta
 ): { meta: VideoCompositionMeta; code: string } | null {
-  // 1. Extract code fence
   const codeMatch =
     rawText.match(/```(?:tsx|typescript|ts|jsx|javascript)?\s*\n([\s\S]*?)```/i) ??
     rawText.match(/```([\s\S]*?)```/);
@@ -77,7 +148,6 @@ function extractResponseArtifacts(
     return null;
   }
 
-  // 2. Extract <cliphub_meta> JSON
   let parsedMeta: Partial<VideoCompositionMeta> = {};
   const metaMatch = rawText.match(/<cliphub_meta>\s*([\s\S]*?)\s*<\/cliphub_meta>/i);
   if (metaMatch) {
@@ -88,7 +158,6 @@ function extractResponseArtifacts(
     }
   }
 
-  // 3. Fallback: inspect `export const videoConfig = { ... }` in TSX
   if (!parsedMeta.title || !parsedMeta.durationInFrames) {
     const titleM = code.match(/title\s*:\s*['"`]([^'"`]+)['"`]/);
     const summaryM = code.match(/summary\s*:\s*['"`]([^'"`]+)['"`]/);
@@ -147,7 +216,25 @@ async function callProviderLLM(
         model,
         max_tokens: 8192,
         system: systemPrompt,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: messages.map((m) => {
+          if (m.role === 'user' && m.images && m.images.length > 0) {
+            return {
+              role: 'user',
+              content: [
+                ...m.images.map((img) => ({
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: img.mimeType,
+                    data: img.base64,
+                  },
+                })),
+                { type: 'text', text: m.content },
+              ],
+            };
+          }
+          return { role: m.role, content: m.content };
+        }),
       }),
     });
 
@@ -172,10 +259,24 @@ async function callProviderLLM(
         systemInstruction: {
           parts: [{ text: systemPrompt }],
         },
-        contents: messages.map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        })),
+        contents: messages.map((m) => {
+          const parts: Array<Record<string, unknown>> = [];
+          if (m.role === 'user' && m.images && m.images.length > 0) {
+            for (const img of m.images) {
+              parts.push({
+                inlineData: {
+                  mimeType: img.mimeType,
+                  data: img.base64,
+                },
+              });
+            }
+          }
+          parts.push({ text: m.content });
+          return {
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts,
+          };
+        }),
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 8192,
@@ -215,7 +316,21 @@ async function callProviderLLM(
       model,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ...messages.map((m) => {
+          if (m.role === 'user' && m.images && m.images.length > 0) {
+            return {
+              role: 'user',
+              content: [
+                { type: 'text', text: m.content },
+                ...m.images.map((img) => ({
+                  type: 'image_url',
+                  image_url: { url: img.dataUrl },
+                })),
+              ],
+            };
+          }
+          return { role: m.role, content: m.content };
+        }),
       ],
       temperature: model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4') ? undefined : 0.7,
     }),
@@ -248,8 +363,19 @@ export async function generateVideoWithAI(
     height,
   };
 
+  const { imageParts, mergedAssets, attachmentPromptSection } = prepareAttachments(
+    req.attachments,
+    req.mode === 'refine' ? req.currentAssets : {}
+  );
+
   const systemPrompt = buildEffectiveSystemPrompt(settings);
-  const history: Message[] = [{ role: 'user', content: buildUserPrompt(req) }];
+  const history: Message[] = [
+    {
+      role: 'user',
+      content: buildUserPrompt(req, attachmentPromptSection),
+      images: imageParts,
+    },
+  ];
 
   const maxRepairs = settings.autoRepairOnError ? 2 : 0;
   let lastError = 'Unknown generation error';
@@ -280,6 +406,7 @@ export async function generateVideoWithAI(
           meta: extracted.meta,
           code: extracted.code,
           compiledCode: compiled.compiledCode,
+          assets: Object.keys(mergedAssets).length > 0 ? mergedAssets : undefined,
           assistantMessage: `${extracted.meta.title} — ${extracted.meta.summary}`,
           repairAttempts: attempt,
         };

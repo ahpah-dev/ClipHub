@@ -35,12 +35,23 @@ export interface VideoCompositionMeta {
   height: number;
 }
 
+export interface PromptAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  kind: 'image' | 'text';
+  size: number;
+  dataUrl?: string;
+  textContent?: string;
+}
+
 export interface VideoProject {
   id: string;
   meta: VideoCompositionMeta;
   code: string;
   updatedAt: number;
   lastPrompt?: string;
+  assets?: Record<string, string>;
 }
 
 export interface ChatTurn {
@@ -49,6 +60,7 @@ export interface ChatTurn {
   content: string;
   timestamp: number;
   meta?: VideoCompositionMeta;
+  attachments?: Array<{ id: string; name: string; kind: 'image' | 'text'; dataUrl?: string }>;
   error?: string;
 }
 
@@ -59,6 +71,8 @@ export interface GenerateVideoRequest {
   fps: number;
   currentCode?: string;
   currentMeta?: VideoCompositionMeta;
+  currentAssets?: Record<string, string>;
+  attachments?: PromptAttachment[];
   mode: 'create' | 'refine';
 }
 
@@ -67,6 +81,7 @@ export interface GenerateVideoResult {
   meta?: VideoCompositionMeta;
   code?: string;
   compiledCode?: string;
+  assets?: Record<string, string>;
   assistantMessage?: string;
   repairAttempts?: number;
   error?: string;
@@ -83,6 +98,7 @@ export interface RenderRequest {
   title: string;
   code: string;
   meta: VideoCompositionMeta;
+  assets?: Record<string, string>;
   outputPath?: string;
   codec: 'h264' | 'h265';
   crf: number;
